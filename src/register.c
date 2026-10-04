@@ -132,20 +132,7 @@ static int increase_rlimit_nofile(unsigned nr)
 		return ret;
 
 	if (rlim.rlim_cur < nr) {
-		rlim_t want = nr;
-
-		/*
-		 * The kernel checks the number of registered files against
-		 * the soft limit, so raise the soft limit to cover the
-		 * request. Clamping to the hard limit is important: adding
-		 * 'nr' to the current soft limit can overshoot the hard
-		 * limit, in which case setrlimit(2) fails with EPERM and
-		 * the registration ends up failing with -EMFILE even though
-		 * the request itself would fit below the hard limit.
-		 */
-		if (want > rlim.rlim_max)
-			want = rlim.rlim_max;
-		rlim.rlim_cur = want;
+		rlim.rlim_cur += nr;
 		__sys_setrlimit(RLIMIT_NOFILE, &rlim);
 	}
 
