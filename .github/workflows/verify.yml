@@ -60,5 +60,5 @@ jobs:
           if [ "${{ matrix.sanitize }}" = "1" ]; then tests="file-register probe reg-wait"; fi;
           for t in $tests; do
             echo "=== running test/$t ===";
-            ./test/$t || { echo "test/$t failed"; exit 1; };
+            ./test/$t.t || { echo "test/$t failed"; exit 1; };
           done
