@@ -1,0 +1,64 @@
+# Verification workflow for fork side branches. Dispatchable only; it never
+# runs in pull request branches. Builds liburing with -Werror on a few
+# compilers and runs the tests affected by the change under test.
+name: verify
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cc: gcc
+            cxx: g++
+            cross: 0
+            sanitize: 0
+          - cc: clang
+            cxx: clang++
+            cross: 0
+            sanitize: 0
+          - cc: i686-linux-gnu-gcc
+            cxx: i686-linux-gnu-g++
+            cross: 1
+            sanitize: 0
+          - cc: clang
+            cxx: clang++
+            cross: 0
+            sanitize: 1
+
+    env:
+      FLAGS: -g -O3 -Wall -Wextra -Werror -Wno-sign-compare
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install cross compiler
+        if: ${{ matrix.cross == 1 }}
+        run: |
+          sudo apt-get update -y;
+          sudo apt-get install -y gcc-i686-linux-gnu g++-i686-linux-gnu;
+
+      - name: Configure and build
+        run: |
+          opts="";
+          if [ "${{ matrix.sanitize }}" = "1" ]; then opts="--enable-sanitizer"; fi;
+          ./configure --cc=${{ matrix.cc }} --cxx=${{ matrix.cxx }} $opts;
+          make -j$(nproc) V=1 CPPFLAGS="-Werror" CFLAGS="$FLAGS" CXXFLAGS="$FLAGS";
+
+      - name: Run targeted tests
+        if: ${{ matrix.cross == 0 }}
+        run: |
+          tests="file-register probe reg-wait sqpoll-disable-exit";
+          if [ "${{ matrix.sanitize }}" = "1" ]; then tests="file-register probe reg-wait"; fi;
+          for t in $tests; do
+            echo "=== running test/$t ===";
+            ./test/$t || { echo "test/$t failed"; exit 1; };
+          done
